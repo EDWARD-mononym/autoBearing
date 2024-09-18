@@ -3,6 +3,11 @@ import argparse
 from data_scripts.FEMTO import FEMTO
 from data_scripts.IMS import IMS
 
+def list_of_floats(arg):
+    return list(map(float, arg.split(',')))
+
+def list_of_string(arg):
+    return arg.split(',')
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Automatic bearing data downloader & processing')
@@ -12,6 +17,8 @@ def parse_arguments():
 
     parser.add_argument('--window_size', default='1024', type=int)
     parser.add_argument('--stride', default='0.2', type=float)
+    parser.add_argument('--few_shots', default='0.01,0.05', type=list_of_floats)
+
 
     parser.add_argument('--fttp', default='True', type=bool)
     parser.add_argument('--normalise', default='True', type=bool)

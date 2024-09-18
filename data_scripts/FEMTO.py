@@ -6,7 +6,7 @@ import torch
 import shutil
 import zipfile
 
-from utils import download_file
+from utils import download_file, sliding_window_subsample, normalise_tensor, subsample_fewshots
 
 class FEMTO():
     def __init__(self, args) -> None:
@@ -17,6 +17,7 @@ class FEMTO():
         self.window_size = args.window_size
         self.stride = args.stride
         self.step = int(self.window_size * self.stride)
+        self.few_shots = args.few_shots
 
         self.fttp = args.fttp
         self.normalise = args.normalise
@@ -70,7 +71,7 @@ class FEMTO():
             bearing3_2 = self.read_signal('bearing3_2')
             bearing3_3 = self.read_signal('bearing3_3')
 
-            if self.fttp: # If true, cut the signal so that only the wear-out period is going to 
+            if self.fttp: #* If true, cut the signal so that only the wear-out period is going to be predicted
                 bearing1_1 = bearing1_1[407:]
                 bearing1_2 = bearing1_2[544:]
                 bearing1_3 = bearing1_3[521:]
@@ -91,29 +92,28 @@ class FEMTO():
                 bearing3_2 = bearing3_2[116:]
                 bearing3_3 = bearing3_3[306:]
 
-            if self.normalise: # If true, normalise the signal so that it has mean=0 and s.d=1
-                bearing1_1 = self.normalise_tensor(bearing1_1)
-                bearing1_2 = self.normalise_tensor(bearing1_2)
-                bearing1_3 = self.normalise_tensor(bearing1_3)
-                bearing1_4 = self.normalise_tensor(bearing1_4)
-                bearing1_5 = self.normalise_tensor(bearing1_5)
-                bearing1_6 = self.normalise_tensor(bearing1_6)
-                bearing1_7 = self.normalise_tensor(bearing1_7)
+            if self.normalise: #* If true, normalise the signal so that it has mean=0 and s.d=1
+                bearing1_1 = normalise_tensor(bearing1_1)
+                bearing1_2 = normalise_tensor(bearing1_2)
+                bearing1_3 = normalise_tensor(bearing1_3)
+                bearing1_4 = normalise_tensor(bearing1_4)
+                bearing1_5 = normalise_tensor(bearing1_5)
+                bearing1_6 = normalise_tensor(bearing1_6)
+                bearing1_7 = normalise_tensor(bearing1_7)
 
-                bearing2_1 = self.normalise_tensor(bearing2_1)
-                bearing2_2 = self.normalise_tensor(bearing2_2)
-                bearing2_3 = self.normalise_tensor(bearing2_3)
-                bearing2_4 = self.normalise_tensor(bearing2_4)
-                bearing2_5 = self.normalise_tensor(bearing2_5)
-                bearing2_6 = self.normalise_tensor(bearing2_6)
-                bearing2_7 = self.normalise_tensor(bearing2_7)
+                bearing2_1 = normalise_tensor(bearing2_1)
+                bearing2_2 = normalise_tensor(bearing2_2)
+                bearing2_3 = normalise_tensor(bearing2_3)
+                bearing2_4 = normalise_tensor(bearing2_4)
+                bearing2_5 = normalise_tensor(bearing2_5)
+                bearing2_6 = normalise_tensor(bearing2_6)
+                bearing2_7 = normalise_tensor(bearing2_7)
 
-                bearing3_1 = self.normalise_tensor(bearing3_1)
-                bearing3_2 = self.normalise_tensor(bearing3_2)
-                bearing3_3 = self.normalise_tensor(bearing3_3)
+                bearing3_1 = normalise_tensor(bearing3_1)
+                bearing3_2 = normalise_tensor(bearing3_2)
+                bearing3_3 = normalise_tensor(bearing3_3)
 
-
-            # Create RUL by counting how many timestep a snapshot has until the last snapshot
+            #* Create RUL by counting how many timestep a snapshot has until the last snapshot
             bearing1_1_y = torch.tensor(np.arange(len(bearing1_1)-1, -1, -1))
             bearing1_2_y = torch.tensor(np.arange(len(bearing1_2)-1, -1, -1))
             bearing1_3_y = torch.tensor(np.arange(len(bearing1_3)-1, -1, -1))
@@ -134,8 +134,7 @@ class FEMTO():
             bearing3_2_y = torch.tensor(np.arange(len(bearing3_2)-1, -1, -1))
             bearing3_3_y = torch.tensor(np.arange(len(bearing3_3)-1, -1, -1))
 
-
-            # Convert RUL from timestep unit to % health remaining
+            #* Convert RUL from timestep unit to % health remaining
             bearing1_1_y = bearing1_1_y / (len(bearing1_1_y)-1)
             bearing1_2_y = bearing1_2_y / (len(bearing1_2_y)-1)
             bearing1_3_y = bearing1_3_y / (len(bearing1_3_y)-1)
@@ -158,54 +157,53 @@ class FEMTO():
 
 
             # Subsample the signal such that it has a length of self.window_size
-            bearing1_1, bearing1_1_y = self.sliding_window_subsample(bearing1_1, bearing1_1_y)
-            bearing1_2, bearing1_2_y = self.sliding_window_subsample(bearing1_2, bearing1_2_y)
-            bearing1_3, bearing1_3_y = self.sliding_window_subsample(bearing1_3, bearing1_3_y)
-            bearing1_4, bearing1_4_y = self.sliding_window_subsample(bearing1_4, bearing1_4_y)
-            bearing1_5, bearing1_5_y = self.sliding_window_subsample(bearing1_5, bearing1_5_y)
-            bearing1_6, bearing1_6_y = self.sliding_window_subsample(bearing1_6, bearing1_6_y)
-            bearing1_7, bearing1_7_y = self.sliding_window_subsample(bearing1_7, bearing1_7_y)
+            bearing1_1, bearing1_1_y = sliding_window_subsample(bearing1_1, bearing1_1_y, self.window_size, self.step)
+            bearing1_2, bearing1_2_y = sliding_window_subsample(bearing1_2, bearing1_2_y, self.window_size, self.step)
+            bearing1_3, bearing1_3_y = sliding_window_subsample(bearing1_3, bearing1_3_y, self.window_size, self.step)
+            bearing1_4, bearing1_4_y = sliding_window_subsample(bearing1_4, bearing1_4_y, self.window_size, self.step)
+            bearing1_5, bearing1_5_y = sliding_window_subsample(bearing1_5, bearing1_5_y, self.window_size, self.step)
+            bearing1_6, bearing1_6_y = sliding_window_subsample(bearing1_6, bearing1_6_y, self.window_size, self.step)
+            bearing1_7, bearing1_7_y = sliding_window_subsample(bearing1_7, bearing1_7_y, self.window_size, self.step)
 
-            bearing2_1, bearing2_1_y = self.sliding_window_subsample(bearing2_1, bearing2_1_y)
-            bearing2_2, bearing2_2_y = self.sliding_window_subsample(bearing2_2, bearing2_2_y)
-            bearing2_3, bearing2_3_y = self.sliding_window_subsample(bearing2_3, bearing2_3_y)
-            bearing2_4, bearing2_4_y = self.sliding_window_subsample(bearing2_4, bearing2_4_y)
-            bearing2_5, bearing2_5_y = self.sliding_window_subsample(bearing2_5, bearing2_5_y)
-            bearing2_6, bearing2_6_y = self.sliding_window_subsample(bearing2_6, bearing2_6_y)
-            bearing2_7, bearing2_7_y = self.sliding_window_subsample(bearing2_7, bearing2_7_y)
+            bearing2_1, bearing2_1_y = sliding_window_subsample(bearing2_1, bearing2_1_y, self.window_size, self.step)
+            bearing2_2, bearing2_2_y = sliding_window_subsample(bearing2_2, bearing2_2_y, self.window_size, self.step)
+            bearing2_3, bearing2_3_y = sliding_window_subsample(bearing2_3, bearing2_3_y, self.window_size, self.step)
+            bearing2_4, bearing2_4_y = sliding_window_subsample(bearing2_4, bearing2_4_y, self.window_size, self.step)
+            bearing2_5, bearing2_5_y = sliding_window_subsample(bearing2_5, bearing2_5_y, self.window_size, self.step)
+            bearing2_6, bearing2_6_y = sliding_window_subsample(bearing2_6, bearing2_6_y, self.window_size, self.step)
+            bearing2_7, bearing2_7_y = sliding_window_subsample(bearing2_7, bearing2_7_y, self.window_size, self.step)
 
-            bearing3_1, bearing3_1_y = self.sliding_window_subsample(bearing3_1, bearing3_1_y)
-            bearing3_2, bearing3_2_y = self.sliding_window_subsample(bearing3_2, bearing3_2_y)
-            bearing3_3, bearing3_3_y = self.sliding_window_subsample(bearing3_3, bearing3_3_y)
+            bearing3_1, bearing3_1_y = sliding_window_subsample(bearing3_1, bearing3_1_y, self.window_size, self.step)
+            bearing3_2, bearing3_2_y = sliding_window_subsample(bearing3_2, bearing3_2_y, self.window_size, self.step)
+            bearing3_3, bearing3_3_y = sliding_window_subsample(bearing3_3, bearing3_3_y, self.window_size, self.step)
+
+            for few_shot_size in self.few_shots:
+                bearing1_1_few, bearing1_1_y_few = subsample_fewshots(bearing1_1, bearing1_1_y, few_shot_size)
+                bearing1_2_few, bearing1_2_y_few = subsample_fewshots(bearing1_2, bearing1_2_y, few_shot_size)
+                bearing2_1_few, bearing2_1_y_few = subsample_fewshots(bearing2_1, bearing2_1_y, few_shot_size)
+                bearing2_2_few, bearing2_2_y_few = subsample_fewshots(bearing2_2, bearing2_2_y, few_shot_size)
+                bearing3_1_few, bearing3_1_y_few = subsample_fewshots(bearing3_1, bearing3_1_y, few_shot_size)
+
+                train_few_shot_x, train_few_shot_y = torch.cat((bearing1_1_few, bearing1_2_few, bearing2_1_few, bearing2_2_few, bearing3_1_few), dim=0), torch.cat((bearing1_1_y_few, bearing1_2_y_few, bearing2_1_y_few, bearing2_2_y_few, bearing3_1_y_few), dim=0)
+                train_few_shot = {"samples": train_few_shot_x, "labels": train_few_shot_y}
+
+                if not os.path.exists(self.processed_path):
+                    os.makedirs(self.processed_path)
+                torch.save(train_few_shot, os.path.join(self.processed_path, f"train_few_shot_{str(few_shot_size).split('.')[1]}.pt"))
 
             train_x, train_y = torch.cat((bearing1_1, bearing1_2, bearing2_1, bearing2_2, bearing3_1), dim=0), torch.cat((bearing1_1_y, bearing1_2_y, bearing2_1_y, bearing2_2_y, bearing3_1_y), dim=0)
-            train_few_shot_x, train_few_shot_y = torch.cat((bearing1_1, bearing2_1, bearing3_1), dim=0), torch.cat((bearing1_1_y, bearing2_1_y, bearing3_1_y), dim=0)
             val_x, val_y = torch.cat((bearing1_3, bearing2_3, bearing3_2), dim=0), torch.cat((bearing1_3_y, bearing2_3_y, bearing3_2_y), dim=0)
             test_x, test_y = torch.cat((bearing1_4, bearing1_5, bearing1_6, bearing1_7, bearing2_4, bearing2_5, bearing2_6, bearing2_7, bearing3_3), dim=0), torch.cat((bearing1_4_y, bearing1_5_y, bearing1_6_y, bearing1_7_y, bearing2_4_y, bearing2_5_y, bearing2_6_y, bearing2_7_y, bearing3_3_y), dim=0)
 
             train = {"samples": train_x, "labels": train_y}
-            train_few_shot = {"samples": train_few_shot_x, "labels": train_few_shot_y}
             val = {"samples": val_x, "labels": val_y}
             test = {"samples": test_x, "labels": test_y}
 
             if not os.path.exists(self.processed_path):
                 os.makedirs(self.processed_path)
-
             torch.save(train, os.path.join(self.processed_path, "train.pt"))
-            torch.save(train_few_shot, os.path.join(self.processed_path, "train_few_shot.pt"))
             torch.save(val, os.path.join(self.processed_path, "val.pt"))
             torch.save(test, os.path.join(self.processed_path, "test.pt"))
-
-    def sliding_window_subsample(self, tensor_x, tensor_y):
-            tensor_x = tensor_x.unfold(2, self.window_size, self.step)
-            B, C, W, L = tensor_x.size() # Get the tensor dimensions for reshaping
-            tensor_x = tensor_x.reshape(B*W, C, L)
-            tensor_y = tensor_y.unsqueeze(1).repeat(1, W).reshape(B*W)
-            return tensor_x, tensor_y
-
-    def normalise_tensor(self, tensor):
-        std, mean = torch.std_mean(tensor, dim=2, keepdim=True)
-        return (tensor - mean) / std
 
     def read_signal(self, bearing_name):
         x_list, y_list = [], []

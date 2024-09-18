@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from pathlib import Path
 import requests
@@ -47,16 +48,19 @@ def download_file(url, download_path, file_name=None):
         if not downloaded:
             raise Exception(f'Failed to download {file_name} after 5 tries, please rerun the code at another time')
 
-# def download(url, download_path, chunk_size=1024):
-#     resp = requests.get(url, stream=True)
-#     total = int(resp.headers.get('content-length', 0))
-#     with open(download_path, 'wb') as file, tqdm(
-#         desc=download_path,
-#         total=total,
-#         unit='iB',
-#         unit_scale=True,
-#         unit_divisor=1024,
-#     ) as bar:
-#         for data in resp.iter_content(chunk_size=chunk_size):
-#             size = file.write(data)
-#             bar.update(size)
+def sliding_window_subsample(tensor_x, tensor_y, window_size, step):
+        if len(tensor_x.shape) == 2:
+            tensor_x.unsqueeze(1)
+        tensor_x = tensor_x.unfold(2, window_size, step)
+        B, C, W, L = tensor_x.size() # Get the tensor dimensions for reshaping
+        tensor_x = tensor_x.reshape(B*W, C, L)
+        tensor_y = tensor_y.unsqueeze(1).repeat(1, W).reshape(B*W)
+        return tensor_x, tensor_y
+
+def normalise_tensor(tensor):
+    std, mean = torch.std_mean(tensor, dim=2, keepdim=True)
+    return (tensor - mean) / std
+
+def subsample_fewshots(tensor_x, tensor_y, few_shot_size):
+    skip_every_n = math.ceil(1.0/few_shot_size)
+    return tensor_x[::skip_every_n], tensor_y[::skip_every_n]
