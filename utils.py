@@ -29,33 +29,33 @@ def set_seed_and_deterministic(seed):
     torch.backends.cudnn.benchmark = False
 
 def download_file(url, download_path, file_name=None):
-        N_tries = 0
-        downloaded = False
-        if not file_name:
-            file_name = Path(url).name
-        file_download_path = download_path.joinpath(file_name)
+    N_tries = 0
+    downloaded = False
+    if not file_name:
+        file_name = Path(url).name
+    file_download_path = download_path.joinpath(file_name)
 
-        while N_tries < 5:
-            try:
-                response = requests.get(url)
-                file_download_path.write_bytes(response.content)
-                downloaded = True
-                break
+    while N_tries < 5:
+        try:
+            response = requests.get(url)
+            file_download_path.write_bytes(response.content)
+            downloaded = True
+            break
 
-            except requests.exceptions.ChunkedEncodingError:
-                N_tries += 1
+        except requests.exceptions.ChunkedEncodingError:
+            N_tries += 1
 
-        if not downloaded:
-            raise Exception(f'Failed to download {file_name} after 5 tries, please rerun the code at another time')
+    if not downloaded:
+        raise Exception(f'Failed to download {file_name} after 5 tries, please rerun the code at another time')
 
 def sliding_window_subsample(tensor_x, tensor_y, window_size, step):
-        if len(tensor_x.shape) == 2:
-            tensor_x.unsqueeze(1)
-        tensor_x = tensor_x.unfold(2, window_size, step)
-        B, C, W, L = tensor_x.size() # Get the tensor dimensions for reshaping
-        tensor_x = tensor_x.reshape(B*W, C, L)
-        tensor_y = tensor_y.unsqueeze(1).repeat(1, W).reshape(B*W)
-        return tensor_x, tensor_y
+    if len(tensor_x.shape) == 2:
+        tensor_x.unsqueeze(1)
+    tensor_x = tensor_x.unfold(2, window_size, step)
+    B, C, W, L = tensor_x.size() # Get the tensor dimensions for reshaping
+    tensor_x = tensor_x.reshape(B*W, C, L)
+    tensor_y = tensor_y.unsqueeze(1).repeat(1, W).reshape(B*W)
+    return tensor_x, tensor_y
 
 def normalise_tensor(tensor):
     std, mean = torch.std_mean(tensor, dim=2, keepdim=True)
@@ -64,3 +64,21 @@ def normalise_tensor(tensor):
 def subsample_fewshots(tensor_x, tensor_y, few_shot_size):
     skip_every_n = math.ceil(1.0/few_shot_size)
     return tensor_x[::skip_every_n], tensor_y[::skip_every_n]
+
+def train_test_split(train_size, x, y=None):
+    total_size = len(x)
+    train_size = int(train_size * total_size) 
+    
+    indices = torch.randperm(total_size)
+    
+    train_indices = indices[:train_size]
+    test_indices = indices[train_size:]
+
+    x_train, x_test = x[train_indices], x[test_indices]
+
+    if y:
+        y_train, y_test = y[train_indices], y[test_indices]
+        return (x_train, y_train), (x_test, y_test)
+
+    else:
+        return x_train, x_test

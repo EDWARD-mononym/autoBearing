@@ -1,18 +1,28 @@
 from bs4 import BeautifulSoup
+import numpy as np
 import os
 from pathlib import Path
 import requests
 import scipy.io
 import torch
 
-from utils import download_file
+from utils import download_file, set_seed_and_deterministic, train_test_split, sliding_window_subsample, subsample_fewshots
 
 class CWRU():
-    def __init__(self, raw_dir, processed_dir) -> None:
+    def __init__(self, args) -> None:
         self.normal_baseline_link = 'https://engineering.case.edu/bearingdatacenter/normal-baseline-data'
         self.drive_end_12k_link = 'https://engineering.case.edu/bearingdatacenter/12k-drive-end-bearing-fault-data'
-        self.download_path = Path(f'{raw_dir}/CWRU')
-        self.processed_path = Path(f'{processed_dir}/CWRU')
+        self.download_path = Path(f'{args.raw_dir}/CWRU')
+        self.processed_path = Path(f'{args.processed_dir}/CWRU')
+
+        self.window_size = args.window_size
+        self.stride = args.stride
+        self.step = int(self.window_size * self.stride)
+        self.few_shots = args.few_shots
+
+        self.train_size = args.train_size
+        self.test_size = args.test_size
+        self.val_size = args.val_size
 
     def process_data(self):
         self.download_data()
@@ -29,8 +39,48 @@ class CWRU():
                       'B021_0', 'B021_1', 'B021_2', 'B021_3',
                       'OR021@6_0', 'OR021@6_1', 'OR021@6_2', 'OR021@6_3']
 
-            for healthy_file in healthy:
-                healthy_mat_name = self.mat_file_name[healthy_file]
+            healthy_signals, faulty_signals = self.read_list_of_bearings(healthy), self.read_list_of_bearings(faulty)
+
+            # Split healthy signals into train, val and test
+            set_seed_and_deterministic(42)
+            train_x, test_val_healthy = train_test_split(self.train_size, healthy_signals)
+            relative_test_size = self.test_size / (self.test_size + self.val_size)
+            test_healthy, val_healthy = train_test_split(relative_test_size, test_val_healthy)
+
+            # Split faulty signals into val and test
+            test_faulty, val_faulty = train_test_split(relative_test_size, faulty_signals)
+
+            # Create labels for train, val, test
+            train_y = torch.zeros(len(train_x))
+            val_healthy_y, val_faulty_y = torch.zeros(len(val_healthy)), torch.ones(len(val_faulty))
+            test_healthy_y, test_faulty_y = torch.zeros(len(test_healthy)), torch.ones(len(test_faulty))
+
+            # Combine healthy and faulty samples
+            val_x, val_y = torch.cat((val_healthy, val_faulty), 0), torch.cat((val_healthy_y, val_faulty_y), 0)
+            test_x, test_y = torch.cat((test_healthy, test_faulty), 0), torch.cat((test_healthy_y, test_faulty_y), 0)
+
+            # Subsample with sliding window
+            train_x, train_y = sliding_window_subsample(train_x, train_y, self.window_size, self.step)
+            val_x, val_y = sliding_window_subsample(val_x, val_y, self.window_size, self.step)
+            test_x, test_y = sliding_window_subsample(test_x, test_y, self.window_size, self.step)
+
+            # Generate fewshots
+            for few_shot_size in self.few_shots:
+                x_few, y_few = subsample_fewshots(train_x, train_y, few_shot_size)
+                train_few_shot = {"samples": x_few, "labels": y_few}
+                if not os.path.exists(self.processed_path):
+                    os.makedirs(self.processed_path)
+                torch.save(train_few_shot, os.path.join(self.processed_path, f"train_few_shot_{str(few_shot_size).split('.')[1]}.pt"))
+
+            # Save data
+            train = {"samples": train_x, "labels": train_y}
+            val = {"samples": val_x, "labels": val_y}
+            test = {"samples": test_x, "labels": test_y}
+            if not os.path.exists(self.processed_path):
+                os.makedirs(self.processed_path)
+            torch.save(train, os.path.join(self.processed_path, "train.pt"))
+            torch.save(val, os.path.join(self.processed_path, "val.pt"))
+            torch.save(test, os.path.join(self.processed_path, "test.pt"))
 
     def download_data(self):
         if not os.path.exists(self.download_path):
@@ -69,25 +119,39 @@ class CWRU():
         print('Downloading CWRU raw files')
         for variable_name, file_name in self.mat_file_name.items():
             try:
-                self.read_mat(os.path.join(self.download_path, file_name))
+                self.read_mat(file_name)
             
             except:
+                file_number = int(file_name.split('.')[0])
+                if file_number >= 3000:
+                    continue
                 print(f'Downloading {file_name}')
                 download_url = mat_links[variable_name]
                 download_file(download_url, self.download_path)
 
-    def read_mat(self, file_name):
-        return scipy.io.loadmat(file_name)
+    def read_list_of_bearings(self, list_of_bearings):
+        x_list, y_list = [], []
+        for bearing_name in list_of_bearings:
+            bearing_mat_name = self.mat_file_name[bearing_name]
+            x, y = self.read_mat(bearing_mat_name)
+            x_list.append(x)
+            y_list.append(y)
+
+        # Convert the list into a np array
+        x_signal, y_signal = np.vstack(x_list), np.vstack(y_list)
+        x_tensor, y_tensor = torch.tensor(x_signal).unsqueeze(1), torch.tensor(y_signal).unsqueeze(1)
+
+        return torch.concatenate((x_tensor, y_tensor), axis=1)
 
     # Functions to extract the data from the .mat file
-    def read_cwru_mat_file(self, mat_file):
+    def read_mat(self, mat_file):
         mat_file_path = os.path.join(self.download_path, mat_file)
-        mat_dict = self.read_mat(mat_file_path)
+        mat_dict = scipy.io.loadmat(mat_file_path)
         de_key, fe_key = self.find_right_keys(mat_dict)
         de_data, fe_data = mat_dict[de_key], mat_dict[fe_key]
-        de_tensor, fe_tensor = torch.tensor(de_data).unsqueeze(1), torch.tensor(fe_data).unsqueeze(1)
-        
-        return torch.concatenate((de_tensor, fe_tensor), axis=1)
+        de_data, fe_data = de_data[:120000], fe_data[:120000] # 12k sampling rate for 10 seconds
+
+        return de_data.T, fe_data.T
         
     def find_right_keys(self, mat_dict): #? Finds the right key to get the DE and FE data
         de_key, fe_key = None, None
