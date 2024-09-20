@@ -211,7 +211,7 @@ class FEMTO():
             if file_name[:3] == 'acc':
                 x, y = self.get_x_y(bearing_name, file_name)
                 x_list.append(x)
-                y_list.append(x)
+                y_list.append(y)
             
         # Convert the list into a np array
         x_signal, y_signal = np.vstack(x_list), np.vstack(y_list)
