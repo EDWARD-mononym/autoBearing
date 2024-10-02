@@ -2,6 +2,8 @@ import argparse
 
 from data_scripts.FEMTO import FEMTO
 from data_scripts.CWRU import CWRU
+# from data_scripts.SCA import SCA
+from data_scripts.FEMTO_fewshot import FEMTO_fewshot
 
 def list_of_floats(arg):
     return list(map(float, arg.split(',')))
@@ -11,13 +13,14 @@ def list_of_string(arg):
 
 dataset_dict = {
     'CWRU': CWRU,
-    'FEMTO': FEMTO
+    'FEMTO': FEMTO,
+    'FEMTO_fewshot': FEMTO_fewshot
 }
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Automatic bearing data downloader & processing')
 
-    parser.add_argument('--dataset', default='CWRU,FEMTO', type=list_of_string, help='dataset to prepare')
+    parser.add_argument('--dataset', default='FEMTO_fewshot', type=list_of_string, help='dataset to prepare')
 
     parser.add_argument('--raw_dir', default='raw_data', type=str, help='directory for downloaded raw data')
     parser.add_argument('--processed_dir', default='processed_data', type=str, help='directory for processed data')
