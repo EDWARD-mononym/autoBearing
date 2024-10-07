@@ -164,5 +164,4 @@ cython_debug/
 # Data files
 raw_data/
 processed_data/
-data_scripts/HITSM.py
 data_scripts/SCA.py
