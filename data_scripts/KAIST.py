@@ -2,12 +2,10 @@ import numpy as np
 import os
 import pandas as pd
 from pathlib import Path
-import py7zr
 import torch
-from scipy.io import loadmat
 import zipfile
 
-from utils import download_file, sliding_window_subsample, normalise_tensor, subsample_fewshots
+from utils import download_file, sliding_window_subsample, normalise_tensor
 
 ################################################# DATASET DESCRIPTION ############################################################################
 # https://data.mendeley.com/datasets/vxkj334rzv/7
