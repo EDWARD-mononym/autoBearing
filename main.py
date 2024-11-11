@@ -7,6 +7,7 @@ from data_scripts.UNSW import UNSW
 from data_scripts.FEMTO_fewshot import FEMTO_fewshot
 from data_scripts.KAIST import KAIST
 from data_scripts.MFPT import MFPT
+from data_scripts.PU import PU
 
 def list_of_floats(arg):
     return list(map(float, arg.split(',')))
@@ -21,13 +22,14 @@ dataset_dict = {
     'HITSM': HITSM,
     'UNSW': UNSW,
     'KAIST': KAIST,
-    'MFPT': MFPT
+    'MFPT': MFPT,
+    'PU': PU
 }
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Automatic bearing data downloader & processing')
 
-    parser.add_argument('--dataset', default='MFPT', type=list_of_string, help='dataset to prepare')
+    parser.add_argument('--dataset', default='PU', type=list_of_string, help='dataset to prepare')
 
     parser.add_argument('--raw_dir', default='raw_data', type=str, help='directory for downloaded raw data')
     parser.add_argument('--processed_dir', default='processed_data', type=str, help='directory for processed data')
