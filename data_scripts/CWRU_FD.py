@@ -8,12 +8,12 @@ import torch
 
 from utils import download_file, set_seed_and_deterministic, train_test_split, sliding_window_subsample, subsample_fewshots
 
-class CWRU():
+class CWRU_FD():
     def __init__(self, args) -> None:
         self.normal_baseline_link = 'https://engineering.case.edu/bearingdatacenter/normal-baseline-data'
         self.drive_end_12k_link = 'https://engineering.case.edu/bearingdatacenter/12k-drive-end-bearing-fault-data'
         self.download_path = Path(f'{args.raw_dir}/CWRU')
-        self.processed_path = Path(f'{args.processed_dir}/CWRU')
+        self.processed_path = Path(f'{args.processed_dir}/CWRU_FD')
 
         self.window_size = args.window_size
         self.stride = args.stride
@@ -29,35 +29,45 @@ class CWRU():
 
         if not os.path.exists(os.path.join(self.processed_path, 'train.pt')):
             healthy = ['Normal_0', 'Normal_1', 'Normal_2', 'Normal_3']
-            faulty = ['IR007_0', 'IR007_1', 'IR007_2', 'IR007_3',
-                      'B007_0', 'B007_1', 'B007_2', 'B007_3',
-                      'OR007@6_0', 'OR007@6_1', 'OR007@6_2', 'OR007@6_3',
-                      'IR014_0', 'IR014_1', 'IR014_2', 'IR014_3',
-                      'B014_0', 'B014_1', 'B014_2', 'B014_3',
-                      'OR014@6_0', 'OR014@6_1', 'OR014@6_2', 'OR014@6_3',
-                      'IR021_0', 'IR021_1', 'IR021_2', 'IR021_3',
-                      'B021_0', 'B021_1', 'B021_2', 'B021_3',
-                      'OR021@6_0', 'OR021@6_1', 'OR021@6_2', 'OR021@6_3']
+            inner_damage = ['IR007_0', 'IR007_1', 'IR007_2', 'IR007_3', 'IR014_0', 'IR014_1', 'IR014_2', 'IR014_3', 'IR021_0', 'IR021_1', 'IR021_2', 'IR021_3']
+            outer_damage = ['OR007@6_0', 'OR007@6_1', 'OR007@6_2', 'OR007@6_3', 'OR014@6_0', 'OR014@6_1', 'OR014@6_2', 'OR014@6_3', 'OR021@6_0', 'OR021@6_1', 'OR021@6_2', 'OR021@6_3']
 
-            healthy_signals, faulty_signals = self.read_list_of_bearings(healthy), self.read_list_of_bearings(faulty)
+            healthy_signals, inner_signals, outer_signals = self.read_list_of_bearings(healthy), self.read_list_of_bearings(inner_damage), self.read_list_of_bearings(outer_damage)
 
             # Split healthy signals into train, val and test
             set_seed_and_deterministic(42)
-            train_x, test_val_healthy = train_test_split(self.train_size, healthy_signals)
-            relative_test_size = self.test_size / (self.test_size + self.val_size)
-            test_healthy, val_healthy = train_test_split(relative_test_size, test_val_healthy)
+            train_healthy, test_val_healthy = train_test_split(self.train_size, healthy_signals)
+            relative_healthy_test_size = self.test_size / (self.test_size + self.val_size)
+            test_healthy, val_healthy = train_test_split(relative_healthy_test_size, test_val_healthy)
 
-            # Split faulty signals into val and test
-            test_faulty, val_faulty = train_test_split(relative_test_size, faulty_signals)
+            # Split inner signals into train, val and test
+            train_inner, test_val_inner = train_test_split(self.train_size, inner_signals)
+            relative_inner_test_size = self.test_size / (self.test_size + self.val_size)
+            test_inner, val_inner = train_test_split(relative_inner_test_size, test_val_inner)
 
-            # Create labels for train, val, test
-            train_y = torch.zeros(len(train_x))
-            val_healthy_y, val_faulty_y = torch.zeros(len(val_healthy)), torch.ones(len(val_faulty))
-            test_healthy_y, test_faulty_y = torch.zeros(len(test_healthy)), torch.ones(len(test_faulty))
+            # Split outer signals into train, val and test
+            train_outer, test_val_outer = train_test_split(self.train_size, outer_signals)
+            relative_outer_test_size = self.test_size / (self.test_size + self.val_size)
+            test_outer, val_outer = train_test_split(relative_outer_test_size, test_val_outer)
 
             # Combine healthy and faulty samples
-            val_x, val_y = torch.cat((val_healthy, val_faulty), 0), torch.cat((val_healthy_y, val_faulty_y), 0)
-            test_x, test_y = torch.cat((test_healthy, test_faulty), 0), torch.cat((test_healthy_y, test_faulty_y), 0)
+            healthy_train_label = torch.full([len(train_healthy)], 0)
+            inner_train_label = torch.full([len(train_inner)], 0)
+            outer_train_label = torch.full([len(train_outer)], 0)
+            train_x = torch.cat((train_healthy, train_inner, train_outer), 0)
+            train_y = torch.cat((healthy_train_label, inner_train_label, outer_train_label), 0)
+
+            healthy_val_label = torch.full([len(val_healthy)], 0)
+            inner_val_label = torch.full([len(val_inner)], 0)
+            outer_val_label = torch.full([len(val_outer)], 0)
+            val_x = torch.cat((val_healthy, val_inner, val_outer), 0)
+            val_y = torch.cat((healthy_val_label, inner_val_label, outer_val_label), 0)
+
+            healthy_test_label = torch.full([len(test_healthy)], 0)
+            inner_test_label = torch.full([len(test_inner)], 0)
+            outer_test_label = torch.full([len(test_outer)], 0)
+            test_x = torch.cat((test_healthy, test_inner, test_outer), 0)
+            test_y = torch.cat((healthy_test_label, inner_test_label, outer_test_label), 0)
 
             # Subsample with sliding window
             train_x, train_y = sliding_window_subsample(train_x, train_y, self.window_size, self.step)
