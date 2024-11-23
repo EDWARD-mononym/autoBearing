@@ -4,6 +4,7 @@ from data_scripts.FEMTO import FEMTO
 from data_scripts.CWRU import CWRU
 from data_scripts.CWRU_FD import CWRU_FD
 from data_scripts.HITSM import HITSM
+from data_scripts.UO import UO
 from data_scripts.UNSW import UNSW
 from data_scripts.FEMTO_fewshot import FEMTO_fewshot
 from data_scripts.KAIST import KAIST
@@ -25,13 +26,14 @@ dataset_dict = {
     'UNSW': UNSW,
     'KAIST': KAIST,
     'MFPT': MFPT,
-    'PU': PU
+    'PU': PU,
+    'UO': UO
 }
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Automatic bearing data downloader & processing')
 
-    parser.add_argument('--dataset', default='CWRU_FD', type=list_of_string, help='dataset to prepare')
+    parser.add_argument('--dataset', default='PU', type=list_of_string, help='dataset to prepare')
 
     parser.add_argument('--raw_dir', default='raw_data', type=str, help='directory for downloaded raw data')
     parser.add_argument('--processed_dir', default='processed_data', type=str, help='directory for processed data')

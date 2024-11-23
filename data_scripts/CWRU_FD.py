@@ -52,20 +52,20 @@ class CWRU_FD():
 
             # Combine healthy and faulty samples
             healthy_train_label = torch.full([len(train_healthy)], 0)
-            inner_train_label = torch.full([len(train_inner)], 0)
-            outer_train_label = torch.full([len(train_outer)], 0)
+            inner_train_label = torch.full([len(train_inner)], 1)
+            outer_train_label = torch.full([len(train_outer)], 2)
             train_x = torch.cat((train_healthy, train_inner, train_outer), 0)
             train_y = torch.cat((healthy_train_label, inner_train_label, outer_train_label), 0)
 
             healthy_val_label = torch.full([len(val_healthy)], 0)
-            inner_val_label = torch.full([len(val_inner)], 0)
-            outer_val_label = torch.full([len(val_outer)], 0)
+            inner_val_label = torch.full([len(val_inner)], 1)
+            outer_val_label = torch.full([len(val_outer)], 2)
             val_x = torch.cat((val_healthy, val_inner, val_outer), 0)
             val_y = torch.cat((healthy_val_label, inner_val_label, outer_val_label), 0)
 
             healthy_test_label = torch.full([len(test_healthy)], 0)
-            inner_test_label = torch.full([len(test_inner)], 0)
-            outer_test_label = torch.full([len(test_outer)], 0)
+            inner_test_label = torch.full([len(test_inner)], 1)
+            outer_test_label = torch.full([len(test_outer)], 2)
             test_x = torch.cat((test_healthy, test_inner, test_outer), 0)
             test_y = torch.cat((healthy_test_label, inner_test_label, outer_test_label), 0)
 
@@ -74,13 +74,13 @@ class CWRU_FD():
             val_x, val_y = sliding_window_subsample(val_x, val_y, self.window_size, self.step)
             test_x, test_y = sliding_window_subsample(test_x, test_y, self.window_size, self.step)
 
-            # Generate fewshots
-            for few_shot_size in self.few_shots:
-                x_few, y_few = subsample_fewshots(train_x, train_y, few_shot_size)
-                train_few_shot = {"samples": x_few, "labels": y_few}
-                if not os.path.exists(self.processed_path):
-                    os.makedirs(self.processed_path)
-                torch.save(train_few_shot, os.path.join(self.processed_path, f"train_few_shot_{str(few_shot_size).split('.')[1]}.pt"))
+            # # Generate fewshots
+            # for few_shot_size in self.few_shots:
+            #     x_few, y_few = subsample_fewshots(train_x, train_y, few_shot_size)
+            #     train_few_shot = {"samples": x_few, "labels": y_few}
+            #     if not os.path.exists(self.processed_path):
+            #         os.makedirs(self.processed_path)
+            #     torch.save(train_few_shot, os.path.join(self.processed_path, f"train_few_shot_{str(few_shot_size).split('.')[1]}.pt"))
 
             # Save data
             train = {"samples": train_x, "labels": train_y}
